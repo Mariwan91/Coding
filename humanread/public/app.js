@@ -6,14 +6,14 @@ const $ = (id) => document.getElementById(id);
 const el = {
   input: $('input'), samples: $('samples'), counter: $('counter'),
   convert: $('convert'), clear: $('clear'), status: $('status'),
-  resultCard: $('result-card'), result: $('result'), stats: $('stats'),
+  resultCard: $('result-card'), result: $('result'), stats: $('stats'), useDict: $('use-dict'), aiBox: $('ai-box'),
   play: $('play'), pause: $('pause'), stop: $('stop'), copy: $('copy'),
   rate: $('rate'), rateOut: $('rate-out'), voice: $('voice'), voiceNote: $('voice-note'),
   dlg: $('word-dialog'), wdSrc: $('wd-src'), wdOut: $('wd-out'), wdAltsWrap: $('wd-alts-wrap'),
   wdAlts: $('wd-alts'), wdSuggest: $('wd-suggest'), wdSend: $('wd-send'), wdMsg: $('wd-msg'),
 };
 
-const state = { dialect: null, result: null, voices: [], speaking: false, editing: -1 };
+const state = { ai: false, dialect: null, result: null, voices: [], speaking: false, editing: -1 };
 
 /* ───────────── أدوات ───────────── */
 
@@ -65,9 +65,9 @@ async function doConvert() {
   el.convert.disabled = true;
   try {
     stopSpeech();
-    state.result = await api('/api/convert', { text, dialect: DIALECT });
+    state.result = await api('/api/convert', { text, dialect: DIALECT, mode: el.useDict.checked ? 'dictionary' : undefined });
     renderResult();
-    setStatus('');
+    setStatus(state.result.warning || '');
   } catch (err) {
     setStatus(err.message, true);
   } finally {
@@ -97,7 +97,9 @@ function renderResult() {
     el.result.append(s);
   });
   const { words, converted, ratio } = r.stats;
-  el.stats.textContent = `تغيّرت ${converted} من ${words} كلمة (${ratio}%)`;
+  el.stats.textContent = r.engine === 'ai'
+    ? 'تحويل بالذكاء الاصطناعي'
+    : `القاموس: تغيّرت ${converted} من ${words} كلمة (${ratio}%)`;
   refreshVoices();
   updateVoiceNote();
 }
@@ -212,6 +214,7 @@ function updateVoiceNote() {
 
 /** يقسم النص إلى جمل قصيرة مع خريطة تربط مواضع الحروف بالكلمات للتظليل */
 function buildChunks() {
+  if (state.result.speech) return buildSpeechChunks(state.result.speech);
   const sp = state.dialect?.speech || {};
   const fix = (s) => Array.from(s, (ch) => sp[ch] ?? ch).join('');
   const chunks = [];
@@ -233,6 +236,12 @@ function buildChunks() {
   });
   flush();
   return chunks;
+}
+
+/** نص القراءة المشكَّل القادم من الذكاء الاصطناعي: جمل قصيرة بلا تظليل (لا تطابق دقيق بين الكلمات) */
+function buildSpeechChunks(speech) {
+  const parts = speech.split(/(?<=[.!؟?؛\n])\s*/).map((s) => s.trim()).filter(Boolean);
+  return parts.map((text) => ({ text, map: [] }));
 }
 
 function highlight(i) {
@@ -326,8 +335,10 @@ el.input.addEventListener('keydown', (e) => {
 (async function init() {
   updateCounter();
   try {
-    const { dialects } = await api('/api/dialects');
+    const { dialects, ai } = await api('/api/dialects');
     state.dialect = dialects.find((d) => d.id === DIALECT);
+    state.ai = ai;
+    el.aiBox.hidden = !ai;
     renderSamples();
     refreshVoices();
     updateVoiceNote();

@@ -10,7 +10,8 @@ const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
-const { convert } = require('./src/engine');
+const { convert, tokenize } = require('./src/engine');
+const ai = require('./src/ai');
 const { listDialects, getDialect } = require('./src/dialects');
 
 const PORT = Number(process.env.PORT) || 3000;
@@ -99,7 +100,7 @@ async function handleApi(req, res, url) {
     return sendJson(res, 200, { ok: true, name: 'humanread', time: new Date().toISOString() });
   }
   if (req.method === 'GET' && url.pathname === '/api/dialects') {
-    return sendJson(res, 200, { dialects: listDialects() });
+    return sendJson(res, 200, { dialects: listDialects(), ai: ai.isEnabled() });
   }
 
   if (req.method === 'POST' && url.pathname === '/api/convert') {
@@ -110,8 +111,26 @@ async function handleApi(req, res, url) {
     if (text.length > MAX_TEXT) return sendJson(res, 413, { error: `الحد الأقصى ${MAX_TEXT} حرف` });
     const dialect = getDialect(body.dialect || 'iraqi');
     if (!dialect) return sendJson(res, 400, { error: 'هذه اللهجة غير متوفرة بعد' });
-    const direction = body.direction === 'toMsa' ? 'toMsa' : 'toDialect';
-    return sendJson(res, 200, convert(text, dialect.id, direction));
+    // الذكاء الاصطناعي هو الافتراضي إن كان مفعّلًا (إلا إذا طُلب القاموس صراحةً)، وإن فشل نرجع للقاموس
+    if (ai.isEnabled() && body.mode !== 'dictionary') {
+      try {
+        const r = await ai.convertWithAI(text);
+        const tokens = tokenize(r.text).map((t) =>
+          t.type === 'sep' ? { ...t, out: t.src } : { ...t, out: t.src, alts: [], kind: 'ai' }
+        );
+        const words = tokens.filter((t) => t.type === 'word').length;
+        return sendJson(res, 200, {
+          dialect: dialect.id, direction: 'toDialect', engine: 'ai', input: text,
+          output: r.text, speech: r.speech, tokens,
+          stats: { words, converted: words, kept: 0, ratio: 100 },
+        });
+      } catch (err) {
+        console.error('AI conversion failed, falling back to dictionary:', err.message);
+        const fallback = convert(text, dialect.id, 'toDialect');
+        return sendJson(res, 200, { ...fallback, engine: 'dictionary', warning: 'تعذّر الذكاء الاصطناعي، استُخدم القاموس' });
+      }
+    }
+    return sendJson(res, 200, { ...convert(text, dialect.id, 'toDialect'), engine: 'dictionary' });
   }
 
   if (req.method === 'POST' && url.pathname === '/api/suggest') {
