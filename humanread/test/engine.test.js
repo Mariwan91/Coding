@@ -77,12 +77,6 @@ test('الاستجابة تحوي تفاصيل كل كلمة', () => {
   ]);
 });
 
-test('اللهجة المصرية: المستقبل والنفي', () => {
-  assert.equal(convert('سأذهب غدا', 'egyptian').output, 'هروح بكرة');
-  assert.equal(convert('لن أذهب', 'egyptian').output, 'مش هروح');
-  assert.equal(convert('لا يوجد ماء', 'egyptian').output, 'مفيش ماء');
-});
-
 test('لهجة غير معروفة ترمي خطأ واضحًا', () => {
   assert.throws(() => convert('مرحبا', 'klingon'), /غير مدعومة/);
 });
@@ -98,31 +92,4 @@ test('سلامة القواميس: لا مدخلات فارغة أو أطوال 
       assert.ok(convert(s, d.id).output.length > 0);
     }
   }
-});
-
-const gf = (t, dir) => convert(t, 'gulf', dir).output;
-
-test('الخليجية: أدوات الاستفهام والطلب', () => {
-  assert.equal(gf('ماذا تريد'), 'شو تبي');
-  assert.equal(gf('هل تريد شاي'), 'تبي شاهي');
-  assert.equal(gf('لا يوجد ماء'), 'ما فيه ماي');
-  assert.equal(gf('الآن'), 'الحين');
-});
-
-test('الخليجية: المستقبل والنفي', () => {
-  assert.equal(gf('سأذهب غدا'), 'بروح باكر');
-  assert.equal(gf('لا أذهب'), 'ما أروح');
-  assert.equal(gf('لم أذهب'), 'ما رحت');
-  assert.equal(gf('لن أذهب'), 'ما بروح');
-});
-
-test('الخليجية: البدائل الإقليمية تظهر في alts', () => {
-  const w = convert('ماذا', 'gulf').tokens[0];
-  assert.equal(w.out, 'شو');
-  assert.ok(w.alts.includes('وش'));
-});
-
-test('الخليجية: التحويل العكسي', () => {
-  assert.equal(gf('وش تسوي الحين؟', 'toMsa'), 'ماذا تفعل الآن؟');
-  assert.equal(gf('هذا الأكل حلو واجد', 'toMsa'), 'هذا الطعام جميل جدا');
 });

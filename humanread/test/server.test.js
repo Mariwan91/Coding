@@ -13,11 +13,9 @@ test.after(() => server.close());
 const post = (path, body) =>
   fetch(base + path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
 
-test('GET /api/dialects يعيد العراقية جاهزة وبقية اللهجات مخطَّط لها', async () => {
+test('GET /api/dialects يعيد العراقية فقط', async () => {
   const { dialects } = await (await fetch(base + '/api/dialects')).json();
-  assert.equal(dialects[0].id, 'iraqi');
-  assert.equal(dialects[0].status, 'ready');
-  assert.ok(dialects.some((d) => d.status === 'planned'));
+  assert.deepEqual(dialects.map((d) => d.id), ['iraqi']);
 });
 
 test('POST /api/convert', async () => {
@@ -28,7 +26,7 @@ test('POST /api/convert', async () => {
 
 test('POST /api/convert يرفض النص الفارغ واللهجة المجهولة والنص الطويل', async () => {
   assert.equal((await post('/api/convert', { text: '  ' })).status, 400);
-  assert.equal((await post('/api/convert', { text: 'مرحبا', dialect: 'levantine' })).status, 400);
+  assert.equal((await post('/api/convert', { text: 'مرحبا', dialect: 'gulf' })).status, 400);
   assert.equal((await post('/api/convert', { text: 'ا'.repeat(5001) })).status, 413);
 });
 

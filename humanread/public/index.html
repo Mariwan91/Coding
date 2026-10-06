@@ -3,51 +3,34 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>HumanRead — اقرأ نصّك بلهجتك</title>
-  <meta name="description" content="حوّل نصّك العربي إلى لهجتك الصحيحة (عراقية، خليجية…)، وقسّمه لمشاهد ريل، واقرأه بشاشة تلقين.">
+  <title>HumanRead — اقرأ نصّك بلهجة عراقية</title>
+  <meta name="description" content="اكتب نصًّا عربيًا واستمع إليه بلهجة عراقية.">
   <meta name="theme-color" content="#0f6b6b">
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <a class="skip" href="#editor">تخطَّ إلى المحرر</a>
-
   <header class="top">
     <div class="wrap top-inner">
       <img class="logo" src="icon.svg" alt="" width="44" height="44">
       <div>
         <h1>HumanRead</h1>
-        <p class="tagline">اقرأ نصّك بلهجتك الصحيحة — لصنّاع الريلز</p>
+        <p class="tagline">اكتب نصًّا عربيًا ← يُقرأ بلهجة عراقية</p>
       </div>
     </div>
   </header>
 
   <main class="wrap">
-    <section aria-labelledby="dialect-h" class="card">
-      <h2 id="dialect-h" class="section-title">اختر اللهجة</h2>
-      <div id="dialects" class="chips" role="radiogroup" aria-labelledby="dialect-h"></div>
-      <p id="dialect-desc" class="muted"></p>
-    </section>
-
     <section id="editor" class="card" aria-labelledby="edit-h">
-      <div class="row between">
-        <h2 id="edit-h" class="section-title">النص</h2>
-        <div id="direction" class="seg" role="radiogroup" aria-label="اتجاه التحويل">
-          <button type="button" role="radio" data-dir="toDialect" aria-checked="true"><span data-from>فصحى</span> ← <span data-to>عراقي</span></button>
-          <button type="button" role="radio" data-dir="toMsa" aria-checked="false"><span data-to2>عراقي</span> ← <span data-from2>فصحى</span></button>
-        </div>
-      </div>
-
-      <label for="input" class="sr-only">النص المراد تحويله</label>
-      <textarea id="input" rows="5" maxlength="5000" spellcheck="false" placeholder="اكتب أو الصق نصًّا بالعربية الفصحى هنا…"></textarea>
-
+      <h2 id="edit-h" class="section-title">النص العربي</h2>
+      <label for="input" class="sr-only">النص المراد قراءته</label>
+      <textarea id="input" rows="5" maxlength="5000" spellcheck="false" placeholder="اكتب أو الصق نصّك بالعربية هنا…"></textarea>
       <div class="row between">
         <div id="samples" class="chips small" aria-label="أمثلة جاهزة"></div>
-        <span id="counter" class="muted small-text" dir="ltr" aria-live="off">0 / 5000</span>
+        <span id="counter" class="muted small-text" dir="ltr">0 / 5000</span>
       </div>
-
       <div class="row">
-        <button id="convert" class="btn primary" type="button">حوِّل النص</button>
+        <button id="convert" class="btn primary" type="button">حوِّل إلى العراقية</button>
         <button id="clear" class="btn ghost" type="button">مسح</button>
         <span id="status" class="muted" role="status" aria-live="polite"></span>
       </div>
@@ -55,14 +38,12 @@
 
     <section id="result-card" class="card" aria-labelledby="res-h" hidden>
       <div class="row between">
-        <h2 id="res-h" class="section-title">النتيجة</h2>
+        <h2 id="res-h" class="section-title">النص بالعراقية</h2>
         <span id="stats" class="pill"></span>
       </div>
-
       <div id="result" class="result" lang="ar" aria-live="polite"></div>
-
       <div class="legend muted small-text">
-        <span><i class="dot mapped"></i> كلمة تغيّرت (اضغط عليها للتفاصيل والتصحيح)</span>
+        <span><i class="dot mapped"></i> كلمة تغيّرت — اضغط عليها لرؤية الأصل والبدائل أو لاقتراح تصحيح</span>
         <span><i class="dot kept"></i> بقيت كما هي</span>
       </div>
 
@@ -81,65 +62,18 @@
           <label>الصوت
             <select id="voice"></select>
           </label>
-          <fieldset class="seg-field">
-            <legend>ماذا أقرأ؟</legend>
-            <label><input type="radio" name="readwhat" value="out" checked> النص الناتج</label>
-            <label><input type="radio" name="readwhat" value="src"> النص الأصلي</label>
-          </fieldset>
         </div>
         <p id="voice-note" class="muted small-text"></p>
       </div>
     </section>
-
-    <section id="reel-card" class="card" aria-labelledby="reel-h" hidden>
-      <div class="row between">
-        <h2 id="reel-h" class="section-title">🎬 مشاهد الريل</h2>
-        <span id="reel-pill" class="pill"></span>
-      </div>
-      <p class="muted small-text">نقسّم نصّك إلى أسطر قصيرة تناسب الظهور على الشاشة، مع تقدير المدة. المدة تقريبية وتتبع «سرعة القراءة».</p>
-      <label class="inline">كلمات في المشهد الواحد
-        <input id="scene-max" type="range" min="4" max="14" step="1" value="8">
-        <output id="scene-max-out">8</output>
-      </label>
-      <ol id="scenes" class="scenes"></ol>
-      <div class="row">
-        <button id="open-prompter" class="btn primary" type="button">📺 شاشة التلقين</button>
-        <button id="copy-scenes" class="btn" type="button">نسخ المشاهد</button>
-        <button id="dl-srt" class="btn" type="button">تنزيل ترجمة SRT</button>
-      </div>
-    </section>
-
-    <section id="history-card" class="card" hidden aria-labelledby="hist-h">
-      <div class="row between">
-        <h2 id="hist-h" class="section-title">آخر التحويلات</h2>
-        <button id="clear-history" class="btn ghost small" type="button">مسح السجل</button>
-      </div>
-      <ul id="history" class="history"></ul>
-    </section>
   </main>
-
-  <div id="prompter" class="prompter" hidden role="dialog" aria-modal="true" aria-label="شاشة التلقين">
-    <div class="p-bar">
-      <button id="p-play" class="btn primary" type="button">▶ ابدأ</button>
-      <label>السرعة <input id="p-speed" type="range" min="10" max="220" value="70"></label>
-      <label>حجم الخط <input id="p-size" type="range" min="28" max="110" value="58"></label>
-      <label class="chk"><input id="p-mirror" type="checkbox"> مرآة</label>
-      <button id="p-close" class="btn" type="button">✕ إغلاق</button>
-    </div>
-    <div id="p-view" class="p-view" tabindex="0" aria-label="نص التلقين، اضغط للإيقاف أو المتابعة">
-      <div id="p-text" class="p-text"></div>
-    </div>
-    <div class="p-guide" aria-hidden="true"></div>
-    <div id="p-count" class="p-count" hidden aria-live="assertive"></div>
-    <p class="p-hint">مسافة = إيقاف/متابعة · ↑ ↓ = السرعة · Esc = إغلاق</p>
-  </div>
 
   <dialog id="word-dialog" aria-labelledby="wd-title">
     <form method="dialog" class="wd">
       <h3 id="wd-title">تفاصيل الكلمة</h3>
       <dl>
         <dt>الأصل</dt><dd id="wd-src"></dd>
-        <dt>الناتج</dt><dd id="wd-out"></dd>
+        <dt>العراقي</dt><dd id="wd-out"></dd>
       </dl>
       <div id="wd-alts-wrap" hidden>
         <p class="muted small-text">بدائل أخرى (اضغط لاستبدال الكلمة):</p>
@@ -147,7 +81,7 @@
       </div>
       <hr>
       <label for="wd-suggest">هل تعرف تعبيرًا أدق؟ اقترح تصحيحًا:</label>
-      <input id="wd-suggest" type="text" maxlength="200" placeholder="اكتب الكلمة الصحيحة بلهجتك">
+      <input id="wd-suggest" type="text" maxlength="200" placeholder="اكتب الكلمة الصحيحة بالعراقي">
       <p id="wd-msg" class="muted small-text" role="status"></p>
       <div class="row">
         <button id="wd-send" class="btn primary" type="button">أرسل الاقتراح</button>
@@ -157,12 +91,10 @@
   </dialog>
 
   <footer class="wrap foot muted small-text">
-    <p>التحويل يعتمد على قاموس وقواعد لغوية قابلة للتوسّع، وقد لا يكون مثاليًا لكل جملة — ساعدنا بتصحيح الكلمات.</p>
-    <p>القراءة الصوتية تستخدم أصوات متصفحك. للحصول على صوت عراقي حقيقي جرّب متصفح Microsoft Edge (يوفّر صوتًا بلهجة عراقية).</p>
+    <p>التحويل يعتمد على قاموس وقواعد لغوية، وقد لا يكون مثاليًا لكل جملة — صحّح الكلمات بالضغط عليها.</p>
+    <p>القراءة الصوتية تستخدم أصوات المتصفح. للحصول على صوت عراقي حقيقي استخدم متصفح Microsoft Edge.</p>
   </footer>
 
-  <script src="reels.js"></script>
-  <script src="prompter.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

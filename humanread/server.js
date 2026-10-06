@@ -3,12 +3,13 @@
  * خادم HumanRead — بلا أي اعتماديات خارجية (Node.js فقط).
  *   GET  /api/health      فحص الحالة
  *   GET  /api/dialects    قائمة اللهجات والأمثلة
- *   POST /api/convert     { text, dialect, direction } ← نص محوَّل + تفاصيل كل كلمة
- *   POST /api/suggest     { dialect, source, suggestion, direction } ← اقتراح تصحيح من المستخدم
+ *   POST /api/convert     { text, dialect } ← نص عراقي + تفاصيل كل كلمة
+ *   POST /api/suggest     { dialect, source, current, suggestion } ← اقتراح تصحيح
  */
 const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
+const crypto = require('node:crypto');
 const { convert } = require('./src/engine');
 const { listDialects, getDialect } = require('./src/dialects');
 
@@ -18,6 +19,8 @@ const PUBLIC_DIR = path.join(__dirname, 'public');
 const DATA_DIR = path.join(__dirname, 'data');
 const MAX_TEXT = 5000;
 const MAX_BODY = 32 * 1024;
+// إذا ضُبط ACCESS_PASSWORD يصبح الموقع خاصًا: يطلب المتصفح كلمة السر (اسم المستخدم أي شيء)
+const ACCESS_PASSWORD = process.env.ACCESS_PASSWORD || '';
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -166,8 +169,23 @@ function serveStatic(req, res, url) {
   });
 }
 
+function authorized(req) {
+  if (!ACCESS_PASSWORD) return true;
+  const h = req.headers.authorization || '';
+  if (!h.startsWith('Basic ')) return false;
+  const given = Buffer.from(h.slice(6), 'base64').toString('utf8');
+  const pass = given.slice(given.indexOf(':') + 1);
+  const a = crypto.createHash('sha256').update(pass).digest();
+  const b = crypto.createHash('sha256').update(ACCESS_PASSWORD).digest();
+  return crypto.timingSafeEqual(a, b);
+}
+
 const server = http.createServer(async (req, res) => {
   try {
+    if (!authorized(req)) {
+      res.writeHead(401, { ...SECURITY_HEADERS, 'WWW-Authenticate': 'Basic realm="HumanRead", charset="UTF-8"', 'Content-Type': 'text/plain; charset=utf-8' });
+      return res.end('مطلوب كلمة السر');
+    }
     const url = new URL(req.url, 'http://localhost');
     if (url.pathname.startsWith('/api/')) return await handleApi(req, res, url);
     return serveStatic(req, res, url);

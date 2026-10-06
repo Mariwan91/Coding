@@ -1,43 +1,21 @@
 'use strict';
-/* واجهة HumanRead: اختيار اللهجة، التحويل عبر الـ API، العرض التفاعلي، والقراءة الصوتية */
+/* واجهة HumanRead: نص عربي ← عراقي ← قراءة صوتية */
 
+const DIALECT = 'iraqi';
 const $ = (id) => document.getElementById(id);
 const el = {
-  dialects: $('dialects'), dialectDesc: $('dialect-desc'), direction: $('direction'),
   input: $('input'), samples: $('samples'), counter: $('counter'),
   convert: $('convert'), clear: $('clear'), status: $('status'),
   resultCard: $('result-card'), result: $('result'), stats: $('stats'),
   play: $('play'), pause: $('pause'), stop: $('stop'), copy: $('copy'),
   rate: $('rate'), rateOut: $('rate-out'), voice: $('voice'), voiceNote: $('voice-note'),
-  historyCard: $('history-card'), history: $('history'), clearHistory: $('clear-history'),
   dlg: $('word-dialog'), wdSrc: $('wd-src'), wdOut: $('wd-out'), wdAltsWrap: $('wd-alts-wrap'),
-  reelCard: $('reel-card'), reelPill: $('reel-pill'), scenes: $('scenes'), sceneMax: $('scene-max'),
-  sceneMaxOut: $('scene-max-out'), openPrompter: $('open-prompter'), copyScenes: $('copy-scenes'), dlSrt: $('dl-srt'),
   wdAlts: $('wd-alts'), wdSuggest: $('wd-suggest'), wdSend: $('wd-send'), wdMsg: $('wd-msg'),
 };
 
-const state = {
-  dialects: [],
-  dialectId: 'iraqi',
-  direction: 'toDialect',
-  result: null,      // آخر استجابة من /api/convert
-  voices: [],
-  speaking: false,
-  editing: -1,       // فهرس الكلمة المفتوحة في نافذة التفاصيل
-};
-
-const currentDialect = () => state.dialects.find((d) => d.id === state.dialectId);
+const state = { dialect: null, result: null, voices: [], speaking: false, editing: -1 };
 
 /* ───────────── أدوات ───────────── */
-
-const store = {
-  get(k, fallback) {
-    try { return JSON.parse(localStorage.getItem(k)) ?? fallback; } catch { return fallback; }
-  },
-  set(k, v) {
-    try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* التخزين غير متاح */ }
-  },
-};
 
 function setStatus(msg, isError = false) {
   el.status.textContent = msg;
@@ -55,88 +33,20 @@ async function api(path, body) {
   return data;
 }
 
-/* ───────────── اللهجات والاتجاه ───────────── */
-
-function renderDialects() {
-  el.dialects.replaceChildren();
-  for (const d of state.dialects) {
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.className = 'chip';
-    b.setAttribute('role', 'radio');
-    b.setAttribute('aria-checked', String(d.id === state.dialectId));
-    b.textContent = d.name;
-    if (d.status === 'planned') {
-      b.disabled = true;
-      b.title = d.region;
-      const tag = document.createElement('span');
-      tag.className = 'tag';
-      tag.textContent = 'قريبًا';
-      b.append(tag);
-    } else if (d.status === 'beta') {
-      const tag = document.createElement('span');
-      tag.className = 'tag';
-      tag.textContent = 'تجريبي';
-      b.append(tag);
-    }
-    b.addEventListener('click', () => selectDialect(d.id));
-    el.dialects.append(b);
+async function copyText(text, okMsg = 'تم النسخ ✔') {
+  try {
+    await navigator.clipboard.writeText(text);
+    setStatus(okMsg);
+  } catch {
+    const ta = document.createElement('textarea');
+    ta.value = text; document.body.append(ta); ta.select();
+    try { document.execCommand('copy'); setStatus(okMsg); } catch { setStatus('تعذّر النسخ', true); }
+    ta.remove();
   }
-  const d = currentDialect();
-  el.dialectDesc.textContent = d ? `${d.region} — ${d.description}` : '';
+  setTimeout(() => setStatus(''), 2000);
 }
 
-function renderDirection() {
-  const d = currentDialect();
-  const [b1, b2] = el.direction.querySelectorAll('button');
-  b1.textContent = `فصحى ← ${d.name}`;
-  b2.textContent = `${d.name} ← فصحى`;
-  b1.setAttribute('aria-checked', String(state.direction === 'toDialect'));
-  b2.setAttribute('aria-checked', String(state.direction === 'toMsa'));
-  el.input.placeholder = state.direction === 'toDialect'
-    ? 'اكتب أو الصق نصًّا بالعربية الفصحى هنا…'
-    : `اكتب أو الصق نصًّا بالعامية (${d.name}) هنا…`;
-  renderSamples();
-}
-
-function renderSamples() {
-  const d = currentDialect();
-  const list = state.direction === 'toDialect' ? d.samples : d.reverseSamples;
-  el.samples.replaceChildren();
-  for (const s of list || []) {
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.className = 'chip';
-    b.textContent = s.length > 34 ? s.slice(0, 32) + '…' : s;
-    b.title = s;
-    b.addEventListener('click', () => {
-      el.input.value = s;
-      updateCounter();
-      doConvert();
-    });
-    el.samples.append(b);
-  }
-}
-
-function selectDialect(id) {
-  if (id === state.dialectId) return;
-  state.dialectId = id;
-  store.set('humanread.dialect', id);
-  stopSpeech();
-  renderDialects();
-  renderDirection();
-  updateVoiceNote();
-  if (el.input.value.trim()) doConvert();
-}
-
-el.direction.addEventListener('click', (e) => {
-  const b = e.target.closest('button[data-dir]');
-  if (!b || b.dataset.dir === state.direction) return;
-  state.direction = b.dataset.dir;
-  stopSpeech();
-  renderDirection();
-  if (el.input.value.trim()) doConvert();
-});
+const outputText = () => state.result?.tokens.map((t) => t.out).join('') ?? '';
 
 /* ───────────── التحويل والعرض ───────────── */
 
@@ -155,9 +65,8 @@ async function doConvert() {
   el.convert.disabled = true;
   try {
     stopSpeech();
-    state.result = await api('/api/convert', { text, dialect: state.dialectId, direction: state.direction });
+    state.result = await api('/api/convert', { text, dialect: DIALECT });
     renderResult();
-    pushHistory(state.result);
     setStatus('');
   } catch (err) {
     setStatus(err.message, true);
@@ -175,7 +84,7 @@ function renderResult() {
       el.result.append(document.createTextNode(t.out));
       return;
     }
-    if (t.out === '') return; // كلمة محذوفة في اللهجة
+    if (t.out === '') return; // كلمة محذوفة في العراقي (مثل «هل»)
     const s = document.createElement('span');
     s.className = `w ${t.kind}`;
     s.dataset.i = String(i);
@@ -189,7 +98,6 @@ function renderResult() {
   });
   const { words, converted, ratio } = r.stats;
   el.stats.textContent = `تغيّرت ${converted} من ${words} كلمة (${ratio}%)`;
-  renderReel();
   refreshVoices();
   updateVoiceNote();
 }
@@ -213,7 +121,6 @@ function openWord(i) {
     b.addEventListener('click', () => {
       t.alts = [t.out, ...alts.filter((x) => x !== a)];
       t.out = a;
-      state.result.output = state.result.tokens.map((x) => x.out).join('');
       renderResult();
       el.dlg.close();
     });
@@ -237,10 +144,7 @@ el.wdSend.addEventListener('click', async () => {
   if (!suggestion) { el.wdMsg.textContent = 'اكتب اقتراحك أولًا'; return; }
   const t = state.result.tokens[state.editing];
   try {
-    await api('/api/suggest', {
-      dialect: state.dialectId, direction: state.direction,
-      source: t.src, current: t.out, suggestion,
-    });
+    await api('/api/suggest', { dialect: DIALECT, source: t.src, current: t.out, suggestion });
     el.wdMsg.textContent = 'شكرًا لك! وصلنا اقتراحك.';
     el.wdSuggest.value = '';
   } catch (err) {
@@ -250,105 +154,22 @@ el.wdSend.addEventListener('click', async () => {
 
 el.copy.addEventListener('click', () => copyText(outputText()));
 
-/* ───────────── مشاهد الريل ───────────── */
-
-const outputText = () => state.result?.tokens.map((t) => t.out).join('').replace(/[ \t]{2,}/g, ' ').trim() ?? '';
-const sceneList = () => Reels.splitScenes(outputText(), Number(el.sceneMax.value));
-const fmtSec = (s) => `${s.toFixed(1)} ث`;
-
-function renderReel() {
-  if (!state.result) { el.reelCard.hidden = true; return; }
-  const rate = Number(el.rate.value) / 0.9; // 0.9 هي السرعة الافتراضية ≈ كلام طبيعي
-  const sum = Reels.summarize(sceneList(), rate);
-  el.reelCard.hidden = sum.scenes.length === 0;
-  el.reelPill.textContent = `≈ ${Math.round(sum.totalSeconds)} ثانية · ${sum.totalWords} كلمة — ${Reels.fitLabel(sum.totalSeconds)}`;
-  el.scenes.replaceChildren();
-  for (const sc of sum.scenes) {
-    const li = document.createElement('li');
-    const t = document.createElement('span');
-    t.className = 'sc-text';
-    t.textContent = sc.text;
-    const sec = document.createElement('span');
-    sec.className = 'sc-sec';
-    sec.textContent = fmtSec(sc.seconds);
+function renderSamples() {
+  el.samples.replaceChildren();
+  for (const s of state.dialect?.samples || []) {
     const b = document.createElement('button');
     b.type = 'button';
-    b.className = 'btn ghost small';
-    b.textContent = 'نسخ';
-    b.addEventListener('click', () => copyText(sc.text, 'تم نسخ المشهد ✔'));
-    li.append(t, sec, b);
-    el.scenes.append(li);
+    b.className = 'chip';
+    b.textContent = s.length > 34 ? s.slice(0, 32) + '…' : s;
+    b.title = s;
+    b.addEventListener('click', () => { el.input.value = s; updateCounter(); doConvert(); });
+    el.samples.append(b);
   }
 }
-
-async function copyText(text, okMsg = 'تم النسخ ✔') {
-  try {
-    await navigator.clipboard.writeText(text);
-    setStatus(okMsg);
-  } catch {
-    const ta = document.createElement('textarea');
-    ta.value = text; document.body.append(ta); ta.select();
-    try { document.execCommand('copy'); setStatus(okMsg); } catch { setStatus('تعذّر النسخ', true); }
-    ta.remove();
-  }
-  setTimeout(() => setStatus(''), 2000);
-}
-
-el.sceneMax.addEventListener('input', () => { el.sceneMaxOut.textContent = el.sceneMax.value; renderReel(); });
-el.copyScenes.addEventListener('click', () => copyText(sceneList().join('\n'), 'تم نسخ كل المشاهد ✔'));
-el.openPrompter.addEventListener('click', () => { stopSpeech(); Prompter.open(sceneList()); });
-el.dlSrt.addEventListener('click', () => {
-  const rate = Number(el.rate.value) / 0.9;
-  const blob = new Blob(['\ufeff' + Reels.toSrt(sceneList(), rate)], { type: 'text/plain;charset=utf-8' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = 'humanread-captions.srt';
-  document.body.append(a);
-  a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-});
-
-/* ───────────── السجل ───────────── */
-
-function pushHistory(r) {
-  const list = store.get('humanread.history', []).filter((h) => !(h.input === r.input && h.dialect === r.dialect && h.direction === r.direction));
-  list.unshift({ dialect: r.dialect, direction: r.direction, input: r.input, output: r.output });
-  store.set('humanread.history', list.slice(0, 8));
-  renderHistory();
-}
-
-function renderHistory() {
-  const list = store.get('humanread.history', []);
-  el.historyCard.hidden = list.length === 0;
-  el.history.replaceChildren();
-  for (const h of list) {
-    const li = document.createElement('li');
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.textContent = h.input.length > 70 ? h.input.slice(0, 68) + '…' : h.input;
-    const sm = document.createElement('small');
-    sm.textContent = h.output.length > 70 ? h.output.slice(0, 68) + '…' : h.output;
-    b.append(sm);
-    b.addEventListener('click', () => {
-      state.dialectId = h.dialect;
-      state.direction = h.direction;
-      el.input.value = h.input;
-      updateCounter();
-      renderDialects();
-      renderDirection();
-      doConvert();
-    });
-    li.append(b);
-    el.history.append(li);
-  }
-}
-el.clearHistory.addEventListener('click', () => { store.set('humanread.history', []); renderHistory(); });
 
 /* ───────────── القراءة الصوتية ───────────── */
 
 const synth = 'speechSynthesis' in window ? window.speechSynthesis : null;
-
 const normLang = (l) => (l || '').replace('_', '-').toLowerCase();
 
 function refreshVoices() {
@@ -356,15 +177,14 @@ function refreshVoices() {
   const all = synth.getVoices().filter((v) => normLang(v.lang).startsWith('ar'));
   state.voices = all;
   const prev = el.voice.value;
-  el.voice.replaceChildren(new Option('تلقائي (الأنسب للهجة)', ''));
+  el.voice.replaceChildren(new Option('تلقائي (الأنسب للعراقية)', ''));
   for (const v of all) el.voice.append(new Option(`${v.name} — ${v.lang}`, v.voiceURI));
   if ([...el.voice.options].some((o) => o.value === prev)) el.voice.value = prev;
 }
 
 function pickVoice() {
   if (el.voice.value) return state.voices.find((v) => v.voiceURI === el.voice.value) || null;
-  const d = currentDialect();
-  for (const lang of d.ttsLangs || []) {
+  for (const lang of state.dialect?.ttsLangs || []) {
     const hit = state.voices.find((v) => normLang(v.lang) === lang.toLowerCase());
     if (hit) return hit;
   }
@@ -372,8 +192,8 @@ function pickVoice() {
 }
 
 function updateVoiceNote() {
-  const d = currentDialect();
-  if (!d) return; // أحداث الأصوات قد تصل قبل تحميل اللهجات
+  const d = state.dialect;
+  if (!d) return; // أحداث الأصوات قد تصل قبل تحميل بيانات اللهجة
   if (!synth) {
     el.voiceNote.textContent = 'متصفحك لا يدعم القراءة الصوتية. جرّب Chrome أو Edge أو Safari.';
     el.play.disabled = true;
@@ -382,17 +202,17 @@ function updateVoiceNote() {
   const v = pickVoice();
   const natives = (d.nativeLangs || []).map((l) => l.toLowerCase());
   if (!v) {
-    el.voiceNote.textContent = 'لم يُعثر على صوت عربي في جهازك. ثبّت صوتًا عربيًا من إعدادات النظام، أو جرّب متصفح Microsoft Edge.';
+    el.voiceNote.textContent = 'لم يُعثر على صوت عربي في جهازك. ثبّت صوتًا عربيًا من إعدادات النظام، أو استخدم متصفح Microsoft Edge.';
   } else if (natives.includes(normLang(v.lang))) {
-    el.voiceNote.textContent = `✔ يُقرأ بصوت ${d.name} أصلي: ${v.name}`;
+    el.voiceNote.textContent = `✔ يُقرأ بصوت عراقي أصلي: ${v.name}`;
   } else {
-    el.voiceNote.textContent = `يُقرأ بصوت «${v.name}» (${v.lang}) — لا يتوفر صوت ${d.name} أصلي في جهازك، فالنطق تقريبي. جرّب Edge للحصول على صوت أقرب.`;
+    el.voiceNote.textContent = `يُقرأ بصوت «${v.name}» (${v.lang}) — لا يتوفر صوت عراقي أصلي في جهازك، فالنطق تقريبي. استخدم Edge للحصول على صوت عراقي حقيقي.`;
   }
 }
 
-/** يقسم النص إلى مقاطع قصيرة (جمل) مع خريطة تربط مواضع الحروف بالكلمات للتظليل */
-function buildChunks(field) {
-  const sp = currentDialect().speech || {};
+/** يقسم النص إلى جمل قصيرة مع خريطة تربط مواضع الحروف بالكلمات للتظليل */
+function buildChunks() {
+  const sp = state.dialect?.speech || {};
   const fix = (s) => Array.from(s, (ch) => sp[ch] ?? ch).join('');
   const chunks = [];
   let cur = { text: '', map: [] };
@@ -401,15 +221,14 @@ function buildChunks(field) {
     cur = { text: '', map: [] };
   };
   state.result.tokens.forEach((t, i) => {
-    const raw = t[field] ?? t.out;
     if (t.type === 'word') {
-      if (!raw) return;
-      const text = fix(raw);
+      if (!t.out) return;
+      const text = fix(t.out);
       cur.map.push({ start: cur.text.length, end: cur.text.length + text.length, i });
       cur.text += text;
     } else {
-      cur.text += raw;
-      if (/[.!؟?؛\n]/.test(raw) || (cur.text.length > 160 && /\s/.test(raw))) flush();
+      cur.text += t.out;
+      if (/[.!؟?؛\n]/.test(t.out) || (cur.text.length > 160 && /\s/.test(t.out))) flush();
     }
   });
   flush();
@@ -428,11 +247,10 @@ function highlight(i) {
 
 function setPlayerUi(speaking, paused = false) {
   state.speaking = speaking;
-  el.play.disabled = speaking && !paused ? true : !synth;
+  el.play.disabled = !synth || (speaking && !paused);
   el.pause.disabled = !speaking;
   el.stop.disabled = !speaking;
   el.pause.textContent = paused ? '▶ متابعة' : '⏸ إيقاف مؤقت';
-  el.play.textContent = '▶ استمع';
 }
 
 function stopSpeech() {
@@ -446,12 +264,10 @@ function stopSpeech() {
 function speak() {
   if (!synth || !state.result) return;
   synth.cancel();
-  const field = document.querySelector('input[name="readwhat"]:checked').value;
-  const chunks = buildChunks(field);
+  const chunks = buildChunks();
   if (!chunks.length) return;
   const voice = pickVoice();
-  const d = currentDialect();
-  const lang = voice?.lang || d.ttsLangs?.find((l) => l.includes('-')) || 'ar-SA';
+  const lang = voice?.lang || 'ar-SA';
   const session = Symbol('speech');
   speak.session = session;
 
@@ -465,7 +281,6 @@ function speak() {
       const hit = c.map.find((m) => e.charIndex >= m.start && e.charIndex < m.end);
       if (hit) highlight(hit.i);
     };
-    u.onstart = () => { if (speak.session === session && n === 0) setPlayerUi(true); };
     u.onend = () => {
       if (speak.session !== session) return;
       if (n === chunks.length - 1) { highlight(null); setPlayerUi(false); }
@@ -487,7 +302,7 @@ el.pause.addEventListener('click', () => {
   if (synth.paused) { synth.resume(); setPlayerUi(true, false); }
   else { synth.pause(); setPlayerUi(true, true); }
 });
-el.rate.addEventListener('input', () => { el.rateOut.textContent = `${Number(el.rate.value).toFixed(1)}×`; renderReel(); });
+el.rate.addEventListener('input', () => { el.rateOut.textContent = `${Number(el.rate.value).toFixed(1)}×`; });
 el.voice.addEventListener('change', () => { updateVoiceNote(); if (state.speaking) speak(); });
 if (synth) synth.addEventListener?.('voiceschanged', () => { refreshVoices(); updateVoiceNote(); });
 window.addEventListener('beforeunload', () => synth?.cancel());
@@ -500,7 +315,6 @@ el.clear.addEventListener('click', () => {
   updateCounter();
   stopSpeech();
   el.resultCard.hidden = true;
-  el.reelCard.hidden = true;
   state.result = null;
   el.input.focus();
 });
@@ -511,14 +325,10 @@ el.input.addEventListener('keydown', (e) => {
 
 (async function init() {
   updateCounter();
-  renderHistory();
   try {
     const { dialects } = await api('/api/dialects');
-    state.dialects = dialects;
-    const saved = store.get('humanread.dialect', 'iraqi');
-    if (dialects.some((d) => d.id === saved && d.status !== 'planned')) state.dialectId = saved;
-    renderDialects();
-    renderDirection();
+    state.dialect = dialects.find((d) => d.id === DIALECT);
+    renderSamples();
     refreshVoices();
     updateVoiceNote();
   } catch (err) {
