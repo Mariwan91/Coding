@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>لهجتي — قارئ اللهجات العربية</title>
-  <meta name="description" content="حوّل أي نص عربي إلى اللهجة العراقية وغيرها واستمع إليه بصوت مسموع.">
+  <title>HumanRead — اقرأ نصّك بلهجتك</title>
+  <meta name="description" content="حوّل نصّك العربي إلى لهجتك الصحيحة (عراقية، خليجية…)، وقسّمه لمشاهد ريل، واقرأه بشاشة تلقين.">
   <meta name="theme-color" content="#0f6b6b">
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="styles.css">
@@ -16,8 +16,8 @@
     <div class="wrap top-inner">
       <img class="logo" src="icon.svg" alt="" width="44" height="44">
       <div>
-        <h1>لهجتي</h1>
-        <p class="tagline">اقرأ العربية بلهجات أهلها — نبدأ من العراق</p>
+        <h1>HumanRead</h1>
+        <p class="tagline">اقرأ نصّك بلهجتك الصحيحة — لصنّاع الريلز</p>
       </div>
     </div>
   </header>
@@ -91,6 +91,24 @@
       </div>
     </section>
 
+    <section id="reel-card" class="card" aria-labelledby="reel-h" hidden>
+      <div class="row between">
+        <h2 id="reel-h" class="section-title">🎬 مشاهد الريل</h2>
+        <span id="reel-pill" class="pill"></span>
+      </div>
+      <p class="muted small-text">نقسّم نصّك إلى أسطر قصيرة تناسب الظهور على الشاشة، مع تقدير المدة. المدة تقريبية وتتبع «سرعة القراءة».</p>
+      <label class="inline">كلمات في المشهد الواحد
+        <input id="scene-max" type="range" min="4" max="14" step="1" value="8">
+        <output id="scene-max-out">8</output>
+      </label>
+      <ol id="scenes" class="scenes"></ol>
+      <div class="row">
+        <button id="open-prompter" class="btn primary" type="button">📺 شاشة التلقين</button>
+        <button id="copy-scenes" class="btn" type="button">نسخ المشاهد</button>
+        <button id="dl-srt" class="btn" type="button">تنزيل ترجمة SRT</button>
+      </div>
+    </section>
+
     <section id="history-card" class="card" hidden aria-labelledby="hist-h">
       <div class="row between">
         <h2 id="hist-h" class="section-title">آخر التحويلات</h2>
@@ -99,6 +117,22 @@
       <ul id="history" class="history"></ul>
     </section>
   </main>
+
+  <div id="prompter" class="prompter" hidden role="dialog" aria-modal="true" aria-label="شاشة التلقين">
+    <div class="p-bar">
+      <button id="p-play" class="btn primary" type="button">▶ ابدأ</button>
+      <label>السرعة <input id="p-speed" type="range" min="10" max="220" value="70"></label>
+      <label>حجم الخط <input id="p-size" type="range" min="28" max="110" value="58"></label>
+      <label class="chk"><input id="p-mirror" type="checkbox"> مرآة</label>
+      <button id="p-close" class="btn" type="button">✕ إغلاق</button>
+    </div>
+    <div id="p-view" class="p-view" tabindex="0" aria-label="نص التلقين، اضغط للإيقاف أو المتابعة">
+      <div id="p-text" class="p-text"></div>
+    </div>
+    <div class="p-guide" aria-hidden="true"></div>
+    <div id="p-count" class="p-count" hidden aria-live="assertive"></div>
+    <p class="p-hint">مسافة = إيقاف/متابعة · ↑ ↓ = السرعة · Esc = إغلاق</p>
+  </div>
 
   <dialog id="word-dialog" aria-labelledby="wd-title">
     <form method="dialog" class="wd">
@@ -127,6 +161,8 @@
     <p>القراءة الصوتية تستخدم أصوات متصفحك. للحصول على صوت عراقي حقيقي جرّب متصفح Microsoft Edge (يوفّر صوتًا بلهجة عراقية).</p>
   </footer>
 
+  <script src="reels.js"></script>
+  <script src="prompter.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

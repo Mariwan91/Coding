@@ -28,14 +28,14 @@ test('POST /api/convert', async () => {
 
 test('POST /api/convert يرفض النص الفارغ واللهجة المجهولة والنص الطويل', async () => {
   assert.equal((await post('/api/convert', { text: '  ' })).status, 400);
-  assert.equal((await post('/api/convert', { text: 'مرحبا', dialect: 'gulf' })).status, 400);
+  assert.equal((await post('/api/convert', { text: 'مرحبا', dialect: 'levantine' })).status, 400);
   assert.equal((await post('/api/convert', { text: 'ا'.repeat(5001) })).status, 413);
 });
 
 test('الملفات الثابتة تُخدَّم ومسارات الخروج مرفوضة', async () => {
   const home = await fetch(base + '/');
   assert.equal(home.status, 200);
-  assert.match(await home.text(), /لهجتي/);
+  assert.match(await home.text(), /HumanRead/);
   const evil = await fetch(base + '/..%2fserver.js');
   assert.notEqual(evil.status, 200);
 });

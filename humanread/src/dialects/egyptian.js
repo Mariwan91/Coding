@@ -107,6 +107,7 @@ module.exports = {
   status: 'beta',
   description: 'نسخة تجريبية مصغّرة — القاموس يتوسّع تدريجيًا.',
   ttsLangs: ['ar-EG', 'ar-SA', 'ar'],
+  nativeLangs: ['ar-EG'],
   speech: { 'گ': 'ج', 'چ': 'تش', 'پ': 'ب', 'ڤ': 'ف' },
   // المستقبل: "سأذهب" ← "هروح" (يُحذف حرف الـ ب من المضارع المبني)
   future: { prefix: 'ه', stripLeading: 'ب', neg: 'مش' },

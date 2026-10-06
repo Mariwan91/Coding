@@ -1,6 +1,6 @@
 'use strict';
 /**
- * خادم "لهجتي" — بلا أي اعتماديات خارجية (Node.js فقط).
+ * خادم HumanRead — بلا أي اعتماديات خارجية (Node.js فقط).
  *   GET  /api/health      فحص الحالة
  *   GET  /api/dialects    قائمة اللهجات والأمثلة
  *   POST /api/convert     { text, dialect, direction } ← نص محوَّل + تفاصيل كل كلمة
@@ -93,7 +93,7 @@ async function handleApi(req, res, url) {
   const ip = req.socket.remoteAddress || 'unknown';
 
   if (req.method === 'GET' && url.pathname === '/api/health') {
-    return sendJson(res, 200, { ok: true, name: 'lahjati', time: new Date().toISOString() });
+    return sendJson(res, 200, { ok: true, name: 'humanread', time: new Date().toISOString() });
   }
   if (req.method === 'GET' && url.pathname === '/api/dialects') {
     return sendJson(res, 200, { dialects: listDialects() });
@@ -181,7 +181,7 @@ const server = http.createServer(async (req, res) => {
 
 if (require.main === module) {
   server.listen(PORT, HOST, () => {
-    console.log(`لهجتي تعمل على: http://localhost:${PORT}`);
+    console.log(`HumanRead يعمل على: http://localhost:${PORT}`);
   });
 }
 

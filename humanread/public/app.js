@@ -1,5 +1,5 @@
 'use strict';
-/* واجهة "لهجتي": اختيار اللهجة، التحويل عبر الـ API، العرض التفاعلي، والقراءة الصوتية */
+/* واجهة HumanRead: اختيار اللهجة، التحويل عبر الـ API، العرض التفاعلي، والقراءة الصوتية */
 
 const $ = (id) => document.getElementById(id);
 const el = {
@@ -11,6 +11,8 @@ const el = {
   rate: $('rate'), rateOut: $('rate-out'), voice: $('voice'), voiceNote: $('voice-note'),
   historyCard: $('history-card'), history: $('history'), clearHistory: $('clear-history'),
   dlg: $('word-dialog'), wdSrc: $('wd-src'), wdOut: $('wd-out'), wdAltsWrap: $('wd-alts-wrap'),
+  reelCard: $('reel-card'), reelPill: $('reel-pill'), scenes: $('scenes'), sceneMax: $('scene-max'),
+  sceneMaxOut: $('scene-max-out'), openPrompter: $('open-prompter'), copyScenes: $('copy-scenes'), dlSrt: $('dl-srt'),
   wdAlts: $('wd-alts'), wdSuggest: $('wd-suggest'), wdSend: $('wd-send'), wdMsg: $('wd-msg'),
 };
 
@@ -119,7 +121,7 @@ function renderSamples() {
 function selectDialect(id) {
   if (id === state.dialectId) return;
   state.dialectId = id;
-  store.set('lahjati.dialect', id);
+  store.set('humanread.dialect', id);
   stopSpeech();
   renderDialects();
   renderDirection();
@@ -187,6 +189,7 @@ function renderResult() {
   });
   const { words, converted, ratio } = r.stats;
   el.stats.textContent = `تغيّرت ${converted} من ${words} كلمة (${ratio}%)`;
+  renderReel();
   refreshVoices();
   updateVoiceNote();
 }
@@ -245,31 +248,78 @@ el.wdSend.addEventListener('click', async () => {
   }
 });
 
-el.copy.addEventListener('click', async () => {
-  const text = state.result?.tokens.map((t) => t.out).join('') ?? '';
+el.copy.addEventListener('click', () => copyText(outputText()));
+
+/* ───────────── مشاهد الريل ───────────── */
+
+const outputText = () => state.result?.tokens.map((t) => t.out).join('').replace(/[ \t]{2,}/g, ' ').trim() ?? '';
+const sceneList = () => Reels.splitScenes(outputText(), Number(el.sceneMax.value));
+const fmtSec = (s) => `${s.toFixed(1)} ث`;
+
+function renderReel() {
+  if (!state.result) { el.reelCard.hidden = true; return; }
+  const rate = Number(el.rate.value) / 0.9; // 0.9 هي السرعة الافتراضية ≈ كلام طبيعي
+  const sum = Reels.summarize(sceneList(), rate);
+  el.reelCard.hidden = sum.scenes.length === 0;
+  el.reelPill.textContent = `≈ ${Math.round(sum.totalSeconds)} ثانية · ${sum.totalWords} كلمة — ${Reels.fitLabel(sum.totalSeconds)}`;
+  el.scenes.replaceChildren();
+  for (const sc of sum.scenes) {
+    const li = document.createElement('li');
+    const t = document.createElement('span');
+    t.className = 'sc-text';
+    t.textContent = sc.text;
+    const sec = document.createElement('span');
+    sec.className = 'sc-sec';
+    sec.textContent = fmtSec(sc.seconds);
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'btn ghost small';
+    b.textContent = 'نسخ';
+    b.addEventListener('click', () => copyText(sc.text, 'تم نسخ المشهد ✔'));
+    li.append(t, sec, b);
+    el.scenes.append(li);
+  }
+}
+
+async function copyText(text, okMsg = 'تم النسخ ✔') {
   try {
     await navigator.clipboard.writeText(text);
-    setStatus('تم النسخ ✔');
+    setStatus(okMsg);
   } catch {
     const ta = document.createElement('textarea');
     ta.value = text; document.body.append(ta); ta.select();
-    try { document.execCommand('copy'); setStatus('تم النسخ ✔'); } catch { setStatus('تعذّر النسخ', true); }
+    try { document.execCommand('copy'); setStatus(okMsg); } catch { setStatus('تعذّر النسخ', true); }
     ta.remove();
   }
   setTimeout(() => setStatus(''), 2000);
+}
+
+el.sceneMax.addEventListener('input', () => { el.sceneMaxOut.textContent = el.sceneMax.value; renderReel(); });
+el.copyScenes.addEventListener('click', () => copyText(sceneList().join('\n'), 'تم نسخ كل المشاهد ✔'));
+el.openPrompter.addEventListener('click', () => { stopSpeech(); Prompter.open(sceneList()); });
+el.dlSrt.addEventListener('click', () => {
+  const rate = Number(el.rate.value) / 0.9;
+  const blob = new Blob(['\ufeff' + Reels.toSrt(sceneList(), rate)], { type: 'text/plain;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'humanread-captions.srt';
+  document.body.append(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 });
 
 /* ───────────── السجل ───────────── */
 
 function pushHistory(r) {
-  const list = store.get('lahjati.history', []).filter((h) => !(h.input === r.input && h.dialect === r.dialect && h.direction === r.direction));
+  const list = store.get('humanread.history', []).filter((h) => !(h.input === r.input && h.dialect === r.dialect && h.direction === r.direction));
   list.unshift({ dialect: r.dialect, direction: r.direction, input: r.input, output: r.output });
-  store.set('lahjati.history', list.slice(0, 8));
+  store.set('humanread.history', list.slice(0, 8));
   renderHistory();
 }
 
 function renderHistory() {
-  const list = store.get('lahjati.history', []);
+  const list = store.get('humanread.history', []);
   el.historyCard.hidden = list.length === 0;
   el.history.replaceChildren();
   for (const h of list) {
@@ -293,7 +343,7 @@ function renderHistory() {
     el.history.append(li);
   }
 }
-el.clearHistory.addEventListener('click', () => { store.set('lahjati.history', []); renderHistory(); });
+el.clearHistory.addEventListener('click', () => { store.set('humanread.history', []); renderHistory(); });
 
 /* ───────────── القراءة الصوتية ───────────── */
 
@@ -330,10 +380,10 @@ function updateVoiceNote() {
     return;
   }
   const v = pickVoice();
-  const native = d.ttsLangs?.[0]?.toLowerCase();
+  const natives = (d.nativeLangs || []).map((l) => l.toLowerCase());
   if (!v) {
     el.voiceNote.textContent = 'لم يُعثر على صوت عربي في جهازك. ثبّت صوتًا عربيًا من إعدادات النظام، أو جرّب متصفح Microsoft Edge.';
-  } else if (normLang(v.lang) === native) {
+  } else if (natives.includes(normLang(v.lang))) {
     el.voiceNote.textContent = `✔ يُقرأ بصوت ${d.name} أصلي: ${v.name}`;
   } else {
     el.voiceNote.textContent = `يُقرأ بصوت «${v.name}» (${v.lang}) — لا يتوفر صوت ${d.name} أصلي في جهازك، فالنطق تقريبي. جرّب Edge للحصول على صوت أقرب.`;
@@ -437,7 +487,7 @@ el.pause.addEventListener('click', () => {
   if (synth.paused) { synth.resume(); setPlayerUi(true, false); }
   else { synth.pause(); setPlayerUi(true, true); }
 });
-el.rate.addEventListener('input', () => { el.rateOut.textContent = `${Number(el.rate.value).toFixed(1)}×`; });
+el.rate.addEventListener('input', () => { el.rateOut.textContent = `${Number(el.rate.value).toFixed(1)}×`; renderReel(); });
 el.voice.addEventListener('change', () => { updateVoiceNote(); if (state.speaking) speak(); });
 if (synth) synth.addEventListener?.('voiceschanged', () => { refreshVoices(); updateVoiceNote(); });
 window.addEventListener('beforeunload', () => synth?.cancel());
@@ -450,6 +500,7 @@ el.clear.addEventListener('click', () => {
   updateCounter();
   stopSpeech();
   el.resultCard.hidden = true;
+  el.reelCard.hidden = true;
   state.result = null;
   el.input.focus();
 });
@@ -464,7 +515,7 @@ el.input.addEventListener('keydown', (e) => {
   try {
     const { dialects } = await api('/api/dialects');
     state.dialects = dialects;
-    const saved = store.get('lahjati.dialect', 'iraqi');
+    const saved = store.get('humanread.dialect', 'iraqi');
     if (dialects.some((d) => d.id === saved && d.status !== 'planned')) state.dialectId = saved;
     renderDialects();
     renderDirection();
