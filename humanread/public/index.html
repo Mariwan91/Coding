@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>HumanRead — اقرأ نصّك بلهجة عراقية</title>
+  <meta name="description" content="اكتب نصًّا عربيًا واستمع إليه بلهجة عراقية.">
+  <meta name="theme-color" content="#0f6b6b">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="top">
+    <div class="wrap top-inner">
+      <img class="logo" src="icon.svg" alt="" width="44" height="44">
+      <div>
+        <h1>HumanRead</h1>
+        <p class="tagline">اكتب نصًّا عربيًا ← يُقرأ بلهجة عراقية</p>
+      </div>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section id="editor" class="card" aria-labelledby="edit-h">
+      <h2 id="edit-h" class="section-title">النص العربي</h2>
+      <label for="input" class="sr-only">النص المراد قراءته</label>
+      <textarea id="input" rows="5" maxlength="5000" spellcheck="false" placeholder="اكتب أو الصق نصّك بالعربية هنا…"></textarea>
+      <div class="row between">
+        <div id="samples" class="chips small" aria-label="أمثلة جاهزة"></div>
+        <span id="counter" class="muted small-text" dir="ltr">0 / 5000</span>
+      </div>
+      <label id="ai-box" class="inline" hidden>
+        <input id="use-dict" type="checkbox"> استخدم القاموس فقط (بدل الذكاء الاصطناعي)
+      </label>
+      <div class="row">
+        <button id="convert" class="btn primary" type="button">حوِّل إلى العراقية</button>
+        <button id="clear" class="btn ghost" type="button">مسح</button>
+        <span id="status" class="muted" role="status" aria-live="polite"></span>
+      </div>
+    </section>
+
+    <section id="result-card" class="card" aria-labelledby="res-h" hidden>
+      <div class="row between">
+        <h2 id="res-h" class="section-title">النص بالعراقية</h2>
+        <span id="stats" class="pill"></span>
+      </div>
+      <div id="result" class="result" lang="ar" aria-live="polite"></div>
+      <div class="legend muted small-text">
+        <span><i class="dot mapped"></i> كلمة تغيّرت — اضغط عليها لرؤية الأصل والبدائل أو لاقتراح تصحيح</span>
+        <span><i class="dot kept"></i> بقيت كما هي</span>
+      </div>
+
+      <div id="pro-box" class="pro" hidden>
+        <h3 class="pro-title">🎙️ صوت احترافي</h3>
+        <div class="row">
+          <label class="grow">الصوت
+            <select id="pro-voice"></select>
+          </label>
+          <button id="pro-gen" class="btn primary" type="button">ولّد الصوت</button>
+        </div>
+        <p id="pro-msg" class="muted small-text" role="status" aria-live="polite"></p>
+        <audio id="pro-audio" controls hidden></audio>
+        <a id="pro-dl" class="btn" download="humanread.mp3" hidden>⬇ تنزيل MP3</a>
+      </div>
+
+      <div class="player" aria-label="القراءة الصوتية السريعة (صوت المتصفح)">
+        <div class="row">
+          <button id="play" class="btn primary" type="button">▶ استمع</button>
+          <button id="pause" class="btn" type="button" disabled>⏸ إيقاف مؤقت</button>
+          <button id="stop" class="btn ghost" type="button" disabled>⏹ إيقاف</button>
+          <button id="copy" class="btn ghost" type="button">نسخ النص</button>
+        </div>
+        <div class="grid">
+          <label>سرعة القراءة
+            <input id="rate" type="range" min="0.5" max="1.5" step="0.1" value="0.9">
+            <output id="rate-out">0.9×</output>
+          </label>
+          <label>الصوت
+            <select id="voice"></select>
+          </label>
+        </div>
+        <p id="voice-note" class="muted small-text"></p>
+      </div>
+    </section>
+  </main>
+
+  <dialog id="word-dialog" aria-labelledby="wd-title">
+    <form method="dialog" class="wd">
+      <h3 id="wd-title">تفاصيل الكلمة</h3>
+      <dl>
+        <dt>الأصل</dt><dd id="wd-src"></dd>
+        <dt>العراقي</dt><dd id="wd-out"></dd>
+      </dl>
+      <div id="wd-alts-wrap" hidden>
+        <p class="muted small-text">بدائل أخرى (اضغط لاستبدال الكلمة):</p>
+        <div id="wd-alts" class="chips small"></div>
+      </div>
+      <hr>
+      <label for="wd-suggest">هل تعرف تعبيرًا أدق؟ اقترح تصحيحًا:</label>
+      <input id="wd-suggest" type="text" maxlength="200" placeholder="اكتب الكلمة الصحيحة بالعراقي">
+      <p id="wd-msg" class="muted small-text" role="status"></p>
+      <div class="row">
+        <button id="wd-send" class="btn primary" type="button">أرسل الاقتراح</button>
+        <button class="btn ghost" value="close">إغلاق</button>
+      </div>
+    </form>
+  </dialog>
+
+  <footer class="wrap foot muted small-text">
+    <p>التحويل يعتمد على قاموس وقواعد لغوية، وقد لا يكون مثاليًا لكل جملة — صحّح الكلمات بالضغط عليها.</p>
+    <p>القراءة الصوتية تستخدم أصوات المتصفح. للحصول على صوت عراقي حقيقي استخدم متصفح Microsoft Edge.</p>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
