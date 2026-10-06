@@ -7,6 +7,7 @@ const el = {
   input: $('input'), samples: $('samples'), counter: $('counter'),
   convert: $('convert'), clear: $('clear'), status: $('status'),
   resultCard: $('result-card'), result: $('result'), stats: $('stats'), useDict: $('use-dict'), aiBox: $('ai-box'),
+  proBox: $('pro-box'), proVoice: $('pro-voice'), proGen: $('pro-gen'), proMsg: $('pro-msg'), proAudio: $('pro-audio'), proDl: $('pro-dl'),
   play: $('play'), pause: $('pause'), stop: $('stop'), copy: $('copy'),
   rate: $('rate'), rateOut: $('rate-out'), voice: $('voice'), voiceNote: $('voice-note'),
   dlg: $('word-dialog'), wdSrc: $('wd-src'), wdOut: $('wd-out'), wdAltsWrap: $('wd-alts-wrap'),
@@ -100,6 +101,7 @@ function renderResult() {
   el.stats.textContent = r.engine === 'ai'
     ? 'تحويل بالذكاء الاصطناعي'
     : `القاموس: تغيّرت ${converted} من ${words} كلمة (${ratio}%)`;
+  resetProAudio();
   refreshVoices();
   updateVoiceNote();
 }
@@ -167,6 +169,66 @@ function renderSamples() {
     b.addEventListener('click', () => { el.input.value = s; updateCounter(); doConvert(); });
     el.samples.append(b);
   }
+}
+
+/* ───────────── الصوت الاحترافي (يولَّد على الخادم) ───────────── */
+
+let proUrl = null;
+
+function resetProAudio() {
+  if (proUrl) { URL.revokeObjectURL(proUrl); proUrl = null; }
+  el.proAudio.hidden = true;
+  el.proAudio.removeAttribute('src');
+  el.proDl.hidden = true;
+  el.proMsg.textContent = '';
+}
+
+/** النص الذي يُرسَل للخادم: المشكَّل من الذكاء الاصطناعي إن وُجد، وإلا نص القاموس مع تعويض الحروف العراقية */
+function speechTextForServer() {
+  const r = state.result;
+  if (r.speech) return r.speech;
+  const sp = state.dialect?.speech || {};
+  return r.tokens.map((t) => Array.from(t.out, (ch) => sp[ch] ?? ch).join('')).join('');
+}
+
+async function generatePro() {
+  if (!state.result) return;
+  el.proGen.disabled = true;
+  el.proMsg.textContent = 'جارٍ توليد الصوت… (قد يستغرق بضع ثوانٍ)';
+  try {
+    const res = await fetch('/api/speak', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: speechTextForServer(), voice: el.proVoice.value, speed: Number(el.rate.value) / 0.9 }),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error || `خطأ ${res.status}`);
+    }
+    const blob = await res.blob();
+    resetProAudio();
+    proUrl = URL.createObjectURL(blob);
+    el.proAudio.src = proUrl;
+    el.proAudio.hidden = false;
+    el.proDl.href = proUrl;
+    el.proDl.hidden = false;
+    el.proMsg.textContent = 'جاهز ✔';
+    el.proAudio.play().catch(() => {}); // قد يمنع المتصفح التشغيل التلقائي؛ الزر موجود
+  } catch (err) {
+    el.proMsg.textContent = err.message;
+  } finally {
+    el.proGen.disabled = false;
+  }
+}
+el.proGen.addEventListener('click', generatePro);
+
+async function initPro() {
+  try {
+    const { enabled, voices } = await api('/api/voices');
+    if (!enabled) return;
+    el.proVoice.replaceChildren(...voices.map((v) => new Option(v.name, v.id)));
+    el.proBox.hidden = false;
+  } catch { /* الصوت الاحترافي اختياري */ }
 }
 
 /* ───────────── القراءة الصوتية ───────────── */
@@ -334,6 +396,7 @@ el.input.addEventListener('keydown', (e) => {
 
 (async function init() {
   updateCounter();
+  initPro();
   try {
     const { dialects, ai } = await api('/api/dialects');
     state.dialect = dialects.find((d) => d.id === DIALECT);

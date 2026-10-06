@@ -4,6 +4,8 @@
  *   GET  /api/health      فحص الحالة
  *   GET  /api/dialects    قائمة اللهجات والأمثلة
  *   POST /api/convert     { text, dialect } ← نص عراقي + تفاصيل كل كلمة
+ *   GET  /api/voices      أصوات الخادم الاحترافية (إن فُعّلت)
+ *   POST /api/speak       { text, voice, speed } ← ملف MP3
  *   POST /api/suggest     { dialect, source, current, suggestion } ← اقتراح تصحيح
  */
 const http = require('node:http');
@@ -12,6 +14,7 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 const { convert, tokenize } = require('./src/engine');
 const ai = require('./src/ai');
+const tts = require('./src/tts');
 const { listDialects, getDialect } = require('./src/dialects');
 
 const PORT = Number(process.env.PORT) || 3000;
@@ -101,6 +104,32 @@ async function handleApi(req, res, url) {
   }
   if (req.method === 'GET' && url.pathname === '/api/dialects') {
     return sendJson(res, 200, { dialects: listDialects(), ai: ai.isEnabled() });
+  }
+
+  if (req.method === 'GET' && url.pathname === '/api/voices') {
+    const voices = tts.isEnabled() ? await tts.listVoices() : [];
+    return sendJson(res, 200, { enabled: voices.length > 0, voices });
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/speak') {
+    if (rateLimited(ip + ':speak', 20, 60_000)) return sendJson(res, 429, { error: 'طلبات كثيرة، حاول بعد قليل' });
+    if (!tts.isEnabled()) return sendJson(res, 503, { error: 'الصوت الاحترافي غير مفعّل على هذا السيرفر' });
+    const body = await readJson(req);
+    try {
+      const out = await tts.synthesize({ text: body.text, voice: body.voice, speed: body.speed });
+      res.writeHead(200, {
+        ...SECURITY_HEADERS,
+        'Content-Type': out.contentType,
+        'Content-Length': out.audio.length,
+        'Cache-Control': 'no-store',
+        'X-Cached': out.cached ? '1' : '0',
+      });
+      return res.end(out.audio);
+    } catch (err) {
+      if (err.status) return sendJson(res, err.status, { error: err.message });
+      console.error('TTS failed:', err.message);
+      return sendJson(res, 502, { error: 'تعذّر توليد الصوت من الخدمة، حاول مجددًا' });
+    }
   }
 
   if (req.method === 'POST' && url.pathname === '/api/convert') {

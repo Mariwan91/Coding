@@ -32,6 +32,23 @@ ANTHROPIC_API_KEY='sk-ant-...' ACCESS_PASSWORD='كلمة-سر' npm start
 - النموذج الافتراضي `claude-sonnet-5-5` ويمكن تغييره بـ `ANTHROPIC_MODEL`. كل تحويل يُحسب على مفتاحكم.
 - النص يُرسل إلى خدمة Anthropic للتحويل، فلا تدخل نصوصًا سرّية إن لم يناسبكم ذلك.
 
+## الصوت الاحترافي (مثل ElevenLabs): ملف MP3 قابل للتنزيل
+بدل صوت المتصفح، يولّد الخادم ملف صوت عبر خدمة خارجية، ويظهر في الصفحة زر «ولّد الصوت» مع مشغّل وتنزيل. فعّل أحد المزوّدين (أو كليهما):
+
+| المزوّد | المتغيّرات | ملاحظات |
+|---|---|---|
+| **Azure Speech** | `AZURE_SPEECH_KEY` و `AZURE_SPEECH_REGION` (مثل `westeurope`) | أصوات **عراقية حقيقية** (رنا/باسل — `ar-IQ`). الأقرب للنطق العراقي. |
+| **ElevenLabs** | `ELEVENLABS_API_KEY` (+ `ELEVENLABS_VOICE_ID` اختياري، `ELEVENLABS_MODEL` الافتراضي `eleven_multilingual_v2`) | تظهر كل أصوات حسابك. للهجة العراقية اختر من Voice Library صوتًا عراقيًا وأضفه لحسابك. |
+
+```bash
+AZURE_SPEECH_KEY=... AZURE_SPEECH_REGION=westeurope \
+ELEVENLABS_API_KEY=... ANTHROPIC_API_KEY=... ACCESS_PASSWORD=... npm start
+```
+- يُرسَل للقراءة النص **المشكَّل** (من وضع الذكاء الاصطناعي) لأفضل نطق.
+- نفس النص والصوت والسرعة لا يُحاسَب مرتين (ذاكرة مؤقتة في الخادم). الحد 5000 حرف لكل طلب.
+- بدون مفاتيح يبقى «استماع سريع» بصوت المتصفح.
+- كل توليد يُحسب على حسابكم لدى المزوّد.
+
 ## كيف يعمل
 - `src/engine.js` — محرك التحويل: عبارات، سوابق (و، ف، ب، ل، ال)، نفي (لا/لم/لن)، مستقبل (سأذهب ← راح أروح)، حذف «هل» و«أن»، الحروف العراقية (گ، چ).
 - `src/dialects/iraqi.js` — قاموس العراقية وجداول تصريف الأفعال. **هنا يُحسَّن مستوى الدقة.**
@@ -40,5 +57,6 @@ ANTHROPIC_API_KEY='sk-ant-...' ACCESS_PASSWORD='كلمة-سر' npm start
 
 ## API
 - `POST /api/convert` `{ "text": "...", "dialect": "iraqi" }`
+- `GET /api/voices` · `POST /api/speak` `{ text, voice, speed }` ← `audio/mpeg`
 - `POST /api/suggest` `{ dialect, source, current, suggestion }`
 - `GET /api/dialects`, `GET /api/health`

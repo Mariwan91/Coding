@@ -50,7 +50,20 @@
         <span><i class="dot kept"></i> بقيت كما هي</span>
       </div>
 
-      <div class="player" aria-label="القراءة الصوتية">
+      <div id="pro-box" class="pro" hidden>
+        <h3 class="pro-title">🎙️ صوت احترافي</h3>
+        <div class="row">
+          <label class="grow">الصوت
+            <select id="pro-voice"></select>
+          </label>
+          <button id="pro-gen" class="btn primary" type="button">ولّد الصوت</button>
+        </div>
+        <p id="pro-msg" class="muted small-text" role="status" aria-live="polite"></p>
+        <audio id="pro-audio" controls hidden></audio>
+        <a id="pro-dl" class="btn" download="humanread.mp3" hidden>⬇ تنزيل MP3</a>
+      </div>
+
+      <div class="player" aria-label="القراءة الصوتية السريعة (صوت المتصفح)">
         <div class="row">
           <button id="play" class="btn primary" type="button">▶ استمع</button>
           <button id="pause" class="btn" type="button" disabled>⏸ إيقاف مؤقت</button>
